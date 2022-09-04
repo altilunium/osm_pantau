@@ -224,6 +224,8 @@ console.log("bro")
 var xhttp = new XMLHttpRequest();
 xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
+        var button = document.getElementById("titl")
+    button.style.backgroundColor = "blue"
        console.log(xhttp.responseText)
        parser = new DOMParser();
        xmlDoc = parser.parseFromString(xhttp.responseText,"text/xml")
@@ -241,15 +243,7 @@ xhttp.onreadystatechange = function() {
         var css = {id:id,timestamp:ts,user:usr,lon:lon,lat:lat}
         datas.push(css)
 
-        var xx = new XMLHttpRequest();
-        xx.onreadystatchange = function(){
-            if (this.readyState == 4 && this.status == 200){
-                console.log("bruh")
-                console.log(xx.responseText)
-            }
-        }
-        xx.open("GET","https://photon.komoot.io/reverse?lon="+lon+"&lat="+lat)
-        xx.send()
+        
        }
         console.log("nyaaa")
         console.log(datas)
@@ -277,6 +271,7 @@ bc()
 
 //State Machine    
 function bc(){
+    times=[]
     console.log("nya")
     console.log(map.getBounds())
     var bbox = map.getBounds()
@@ -287,6 +282,8 @@ function bc(){
     var west = bbox._southWest.lng
     xhttp.open("GET", "https://api.openstreetmap.org/api/0.6/changesets?bbox="+west+","+south+","+east+","+north, true);
     xhttp.send();
+    var button = document.getElementById("titl")
+    button.style.backgroundColor = "red"
 }
 
 
