@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OSM_PANTAU!</title>
+    <link rel="icon" href="logo.png" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="leaflet.css" />
+    <script src="leaflet.js"></script>
+    
+
+<style>
+@font-face {
+    font-family: 'Noto';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Open Sans Regular'),url('r/noto.woff2') format('woff');
+}
+
+
+html,body,#mapid {
+height: 100%;
+width: 100%;
+left:0px;
+position: fixed;
+top:0px;
+}	
+
+img {
+    width : 300px;
+}
+
+#titl{
+	width: 70px;
+    height:70px;
+    border-radius: 90px;
+	position: fixed;
+	right:20px;
+	bottom:20px;
+	background-color: #3232e6;
+    z-index: 30;	
+}
+
+#titl2{
+	width: 70px;
+    height:70px;
+    border-radius: 90px;
+	position: fixed;
+	left:20px;
+	bottom:20px;
+	background-color:red;
+    z-index: 30;
+    display: none;	
+}
+
+.ppp{
+  display: fixed;
+}
+
+#tw{
+    position:fixed;
+    margin:0 auto;
+    background-color: white;
+    width:100%;
+    height:100%;
+    z-index: 20;
+    top:0px;
+    left:0px;
+    display:none;
+   
+}
+
+#main-txtbox{
+    width: 95%;
+    border: 0px;
+    padding-left: 5%;
+    overflow: hidden;
+    resize: none;
+    font-family: 'Noto';
+    color: #1A1A1B;
+    font-size: 14px;
+    line-height: 21px;
+    font-weight: 400;
+    padding-bottom: 500px;
+    margin-top: 47px;
+    max-width: 750px;
+
+}
+
+#main-txtbox:focus-visible{
+    outline: none;
+}
+
+</style>
+</head>
+<body>
+<div id="titl" onclick="bc()"></div>
+<div id="titl2" onclick="bc2()"></div>
+<div id="tw"><div id="main-txtbox" contenteditable></div></div>
+    
+<div id="mapid"></div>
+
+
+
+<script src="dexie.js"></script>
+<script>
+
+
+var db = new Dexie("mapDB");
+db.version(1).stores({
+    places: "++id, lat,lon,usr,syn",
+    mapState: "++k, lat,lon,z"
+});
+
+db.version(2).stores({
+    places: "++id, lat,lon,usr,syn",
+    mapState: "++k, lat,lon,z"
+}).upgrade()
+
+
+
+var vid = "";	
+
+// Initialize the agent at application startup.
+const fpPromise = new Promise((resolve, reject) => {
+  const script = document.createElement('script')
+  script.onload = resolve
+  script.onerror = reject
+  script.async = true
+  script.src = 'fp.js'
+  document.head.appendChild(script)
+})
+  .then(() => FingerprintJS.load())
+
+// Get the visitor identifier when you need it.
+fpPromise
+  .then(fp => fp.get())
+  .then(result => {
+    // This is the visitor identifier:
+    const visitorId = result.visitorId
+    console.log(visitorId)
+    vid = visitorId;
+    
+  })
+
+
+
+    var bu = document.getElementById("titl");
+    var bu2 = document.getElementById("titl2");
+    var tx = document.getElementById("tw")
+    var state = 1;
+    var x_lat;
+    var x_lon;
+    var x_usr;
+   
+
+
+//Save
+async function s()   {
+  	var twit = document.getElementById("main-txtbox").innerHTML;
+  	if (twit.length > 0) {
+  		document.getElementById("main-txtbox").innerHTML = "";
+
+db.transaction("rw", db.places, function*(){
+    var p = yield db.places.add({
+        lat: x_lat,
+        lon: x_lon,
+        usr: vid,
+        syn:twit 
+    })
+})
+
+
+
+
+  ref()
+  bc2()
+  }
+}
+
+
+
+
+
+
+var map = L.map('mapid',{ zoomControl: false }).setView({lat: -2.811371193331128, lng:  113.64257812500001},5)
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+maxZoom: 19,
+attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+}).addTo(map);
+
+
+L.control.scale().addTo(map);
+
+async function setFocus(){
+    db.transaction("rw",db.mapState, function*(){
+    var points = yield db.mapState.where({k:1}).first();
+    if (points){
+        map.setView({lat:points.lat, lng:points.lon},points.z)
+    }
+
+
+    console.log("HEAAA!")
+    console.log(points)
+    console.log("BRUH")
+    })
+}
+
+
+setFocus()
+
+var datas=[]
+var times=[]
+
+Array.prototype.max = function() {
+  return Math.max.apply(null, this);
+};
+
+Array.prototype.min = function() {
+  return Math.min.apply(null, this);
+};
+
+console.log("bro")
+var xhttp = new XMLHttpRequest();
+xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+       console.log(xhttp.responseText)
+       parser = new DOMParser();
+       xmlDoc = parser.parseFromString(xhttp.responseText,"text/xml")
+       console.log(xmlDoc)
+       var cs = xmlDoc.getElementsByTagName("changeset")
+       console.log(cs)
+       for (var i = 0 ; i < cs.length ; i++){
+        console.log(cs[i].getAttribute("created_at"))
+        console.log(cs[i].getAttribute("user"))
+        var ts = cs[i].getAttribute("created_at")
+        var usr = cs[i].getAttribute("user")
+        var lon = cs[i].getAttribute("min_lon")
+        var lat = cs[i].getAttribute("min_lat")
+        var id = cs[i].getAttribute("id")
+        var css = {id:id,timestamp:ts,user:usr,lon:lon,lat:lat}
+        datas.push(css)
+
+        var xx = new XMLHttpRequest();
+        xx.onreadystatchange = function(){
+            if (this.readyState == 4 && this.status == 200){
+                console.log("bruh")
+                console.log(xx.responseText)
+            }
+        }
+        xx.open("GET","https://photon.komoot.io/reverse?lon="+lon+"&lat="+lat)
+        xx.send()
+       }
+        console.log("nyaaa")
+        console.log(datas)
+
+
+        for (var i=0;i<datas.length;i++){
+            var curr = new Date(Date.parse(datas[i].timestamp))
+            times.push(curr)
+        }
+        console.log("UMA!")
+        console.log(times.max())
+        console.log(times.min())
+
+
+
+        ref()
+    }
+};
+
+bc()
+
+//xhttp.open("GET", "https://api.openstreetmap.org/api/0.6/changesets?bbox=106.7623901,-6.5936739,107.3501587,-6.0285793", true);
+//xhttp.send();
+
+
+//State Machine    
+function bc(){
+    console.log("nya")
+    console.log(map.getBounds())
+    var bbox = map.getBounds()
+    console.log(bbox._northEast.lat)
+    var north = bbox._northEast.lat
+    var east = bbox._northEast.lng
+    var south = bbox._southWest.lat
+    var west = bbox._southWest.lng
+    xhttp.open("GET", "https://api.openstreetmap.org/api/0.6/changesets?bbox="+west+","+south+","+east+","+north, true);
+    xhttp.send();
+}
+
+
+function HSVtoRGB(h, s, v) {
+    var r, g, b, i, f, p, q, t;
+    if (arguments.length === 1) {
+        s = h.s, v = h.v, h = h.h;
+    }
+    i = Math.floor(h * 6);
+    f = h * 6 - i;
+    p = v * (1 - s);
+    q = v * (1 - f * s);
+    t = v * (1 - (1 - f) * s);
+    switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+    return {
+        r: Math.round(r * 255),
+        g: Math.round(g * 255),
+        b: Math.round(b * 255)
+    };
+}
+
+
+function timeDifference(previous) {
+    var current = Date.now()
+    var msPerMinute = 60 * 1000;
+    var msPerHour = msPerMinute * 60;
+    var msPerDay = msPerHour * 24;
+    var msPerMonth = msPerDay * 30;
+    var msPerYear = msPerDay * 365;
+
+    var elapsed = current - previous;
+
+    if (elapsed < msPerMinute) {
+         return Math.round(elapsed/1000) + ' seconds ago';   
+    }
+
+    else if (elapsed < msPerHour) {
+         return Math.round(elapsed/msPerMinute) + ' minutes ago';   
+    }
+
+    else if (elapsed < msPerDay ) {
+         return Math.round(elapsed/msPerHour ) + ' hours ago';   
+    }
+
+    else if (elapsed < msPerMonth) {
+        return 'approximately ' + Math.round(elapsed/msPerDay) + ' days ago';   
+    }
+
+    else if (elapsed < msPerYear) {
+        return 'approximately ' + Math.round(elapsed/msPerMonth) + ' months ago';   
+    }
+
+    else {
+        return 'approximately ' + Math.round(elapsed/msPerYear ) + ' years ago';   
+    }
+}
+
+// Place points
+async function ref() {
+
+  db.transaction("rw",db.places, function*(){
+    //var points = yield db.places.toArray()
+    var points = datas
+    console.log(points)
+
+    for (var i= points.length-1; i>=0 ; i--){
+        var ttag = points[i].syn
+        
+
+        var gap = times.max() - times.min()
+        var color_pos = ((times[i] - times.min())/gap)*232
+        var hue = (232 - color_pos)/360
+        var rgbconv = HSVtoRGB(hue,1,1)
+        console.log(HSVtoRGB(hue,1,1))
+        var rgbcode = "rgb("+ rgbconv.r +","+ rgbconv.g +","+ rgbconv.b +")"
+        console.log(rgbcode)
+        var fColor = rgbcode
+        
+
+        var c = L.circle([points[i].lat,points[i].lon],{
+            radius : 400,
+            fillColor : fColor,
+            color : fColor,
+            fillOpacity : 0.5
+        }).on('click',markClick).addTo(map);
+        var nya = "https://www.openstreetmap.org/changeset/" + points[i].id
+        nya = "<a href='"+nya+"' target='_blank'>"+points[i].user+"</a><br>"+ timeDifference(times[i])
+        c.bindPopup(nya)
+
+    }
+
+  })
+
+async function markClick(e){
+    console.log(e)
+}
+
+  
+
+ 
+
+
+}
+
+ref()
+
+
+      
+
+
+var tempPos
+map.on('click', function(e) {
+    if (state == 3){
+     map.removeLayer(tempPos);
+     state = 2;   
+    }
+
+    if (state == 2 ){
+        x_lat = e.latlng.lat;
+        x_lon = e.latlng.lng;
+        console.log(e.latlng.lat,e.latlng.lng);
+        tempPos = L.circle([e.latlng.lat,e.latlng.lng], {
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.5,
+            radius: 2
+        })
+
+        tempPos.addTo(map);
+        bu.style.backgroundColor = "green"
+        state = 3 
+        bu2.style.display = "block"
+    }
+})
+
+
+map.on('zoomend',function(e) {
+   console.log(e.target.getCenter());
+   console.log(e.target.getZoom());
+   //db.friends.put({id: 4, name: "Foo", age: 33});
+
+
+//mapState: "++k, lat,lon,z"
+db.transaction("rw", db.mapState, function*(){
+    var p = yield db.mapState.put({
+        k:1,
+        lat: e.target.getCenter().lat,
+        lon : e.target.getCenter().lng,
+        z : e.target.getZoom()
+    })
+})
+
+
+})
+
+function bc2(){
+    map.removeLayer(tempPos);
+    state = 1;
+    bu.style.backgroundColor = "blue"
+    bu2.style.display = "none"
+    tx.style.display = "none"
+
+
+}
+
+var isMapShown = true
+
+document.onkeyup = function(e) {
+    console.log(e)
+    if (e.ctrlKey && e.which == 190) {
+        var lonlat = prompt("Enter coordinate");
+        lonlat = lonlat.split(",")
+        console.log(lonlat)
+        map.setView(lonlat)
+        x_lat = lonlat[0]
+        x_lon = lonlat[1]
+        tempPos = L.circle([lonlat[0],lonlat[1]], {
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.5,
+            radius: 10
+        })
+        tempPos.addTo(map);
+        state = 3;
+        bu2.style.display = "block"
+    }
+    else if(e.ctrlKey && e.which == 188){
+        var x = document.getElementsByClassName("leaflet-layer")
+        if (isMapShown){
+            x[0].style.display = "none"
+            isMapShown = false
+        }
+        else {
+            x[0].style.display = "block"
+            isMapShown = true
+        }
+        
+    }
+}
+
+     
+
+
+    
+
+
+</script>
+</body>
+</html>
+
+
+
