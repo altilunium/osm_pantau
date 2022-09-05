@@ -1,4 +1,6 @@
 # osm_pantau
+![](https://qu.ax/syrA.png)
+
 See current OSM recent changes.
 
 * How to use  : click the blue button to refresh.
