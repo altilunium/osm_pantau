@@ -189,8 +189,11 @@ maxZoom: 19,
 attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
 }).addTo(map);
 
-
 L.control.scale().addTo(map);
+var markers = L.layerGroup();
+
+var theZoom
+
 
 async function setFocus(){
     db.transaction("rw",db.mapState, function*(){
@@ -199,10 +202,9 @@ async function setFocus(){
         map.setView({lat:points.lat, lng:points.lon},points.z)
     }
 
+    theZoom = points.z
 
-    console.log("HEAAA!")
-    console.log(points)
-    console.log("BRUH")
+    
     })
 }
 
@@ -221,6 +223,50 @@ Array.prototype.min = function() {
 };
 
 console.log("bro")
+
+var theClick = 0
+
+
+var yhttp = new XMLHttpRequest()
+yhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+        console.log("HYAAAAAAAAAAAAAA")
+        console.log(yhttp.responseText)
+      var parser = new DOMParser();
+       var xmlDoc = parser.parseFromString(yhttp.responseText,"text/xml")
+       var cs = xmlDoc.getElementsByTagName("tag")
+
+
+       var nodes=[], values=[];
+
+for (var x = 0; x < cs.length ; x++){
+
+for (var att, i = 0, atts = cs[x].attributes, n = atts.length; i < n; i++){
+    att = atts[i];
+    nodes.push(att.nodeName);
+    values.push(att.nodeValue);
+}
+
+
+}
+
+
+
+var theHTML = ""
+       //console.log(cs)
+       for (var i=0 ;i<nodes.length;i = i+2){
+        console.log(values[i]+":"+values[i+1])
+        theHTML = theHTML + values[i]+":"+values[i+1] + "<br>"
+       }
+
+       var tar = document.getElementById(theClick)
+       tar.innerHTML = "<i>"+theHTML+"</i>"
+
+
+    }
+}
+
+
 var xhttp = new XMLHttpRequest();
 xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -231,16 +277,29 @@ xhttp.onreadystatechange = function() {
        xmlDoc = parser.parseFromString(xhttp.responseText,"text/xml")
        console.log(xmlDoc)
        var cs = xmlDoc.getElementsByTagName("changeset")
-       console.log(cs)
+
+
        for (var i = 0 ; i < cs.length ; i++){
-        console.log(cs[i].getAttribute("created_at"))
-        console.log(cs[i].getAttribute("user"))
+         var cc = cs[i].querySelectorAll('[k="comment"]');
+      
+        try{
+            console.log("CC:",cc[0].getAttribute("v"))
+       var comm = cc[0].getAttribute("v")
+        }
+        catch(err){
+            var comm =""
+        }
+       
+
         var ts = cs[i].getAttribute("created_at")
         var usr = cs[i].getAttribute("user")
         var lon = cs[i].getAttribute("min_lon")
         var lat = cs[i].getAttribute("min_lat")
         var id = cs[i].getAttribute("id")
-        var css = {id:id,timestamp:ts,user:usr,lon:lon,lat:lat}
+        
+
+        
+        var css = {id:id,timestamp:ts,user:usr,lon:lon,lat:lat,com:comm}
         datas.push(css)
 
         
@@ -263,7 +322,8 @@ xhttp.onreadystatechange = function() {
     }
 };
 
-bc()
+
+
 
 //xhttp.open("GET", "https://api.openstreetmap.org/api/0.6/changesets?bbox=106.7623901,-6.5936739,107.3501587,-6.0285793", true);
 //xhttp.send();
@@ -272,7 +332,7 @@ bc()
 //State Machine    
 function bc(){
     times=[]
-    console.log("nya")
+    console.log("bc called!")
     console.log(map.getBounds())
     var bbox = map.getBounds()
     console.log(bbox._northEast.lat)
@@ -348,6 +408,10 @@ function timeDifference(previous) {
     }
 }
 
+
+
+
+
 // Place points
 async function ref() {
 
@@ -357,28 +421,56 @@ async function ref() {
     console.log(points)
 
     for (var i= points.length-1; i>=0 ; i--){
-        var ttag = points[i].syn
+       
         
-
         var gap = times.max() - times.min()
         var color_pos = ((times[i] - times.min())/gap)*232
         var hue = (232 - color_pos)/360
         var rgbconv = HSVtoRGB(hue,1,1)
-        console.log(HSVtoRGB(hue,1,1))
+        
         var rgbcode = "rgb("+ rgbconv.r +","+ rgbconv.g +","+ rgbconv.b +")"
-        console.log(rgbcode)
+        
         var fColor = rgbcode
         
-
+       
+        
+        var dynsize = 100
+        
+        var zlevel = map.getZoom()
+        if(zlevel <= 9){
+            dynsize = 900
+        }
+        else {
+            dynsize = 100
+        }
+        
         var c = L.circle([points[i].lat,points[i].lon],{
-            radius : 400,
+            radius : dynsize,
             fillColor : fColor,
             color : fColor,
             fillOpacity : 0.5
         }).on('click',markClick).addTo(map);
         var nya = "https://www.openstreetmap.org/changeset/" + points[i].id
-        nya = "<a href='"+nya+"' target='_blank'>"+points[i].user+"</a><br>"+ timeDifference(times[i])
-        c.bindPopup(nya)
+        nya = "<a href='"+nya+"' target='_blank'>"+points[i].user +"</a>"+ " : "+points[i].com+"<br>"+ timeDifference(times[i])
+        nya = nya + "<div id='"+points[i].id+"'>Loading..</div>" 
+        c.bindPopup(nya,{maxWidth : 1200}).on("popupopen",(e) =>{
+            console.log(e.popup._content)
+            
+let ids = e.popup._content.match(/id='(.*?)'/g).map((val) => {
+    return val.replace(/id='/g,'').replace("'",'');
+})
+console.log(ids)
+
+theClick = ids[0]
+yhttp.open("GET", "https://api.openstreetmap.org/api/0.6/changeset/"+ids[0]+"/download", true);
+yhttp.send();
+
+
+
+
+        })
+        c.addTo(markers)
+        
 
     }
 
@@ -431,6 +523,30 @@ map.on('zoomend',function(e) {
    console.log(e.target.getCenter());
    console.log(e.target.getZoom());
    //db.friends.put({id: 4, name: "Foo", age: 33});
+   theZoom = e.target.getZoom()
+    console.log("THE ZOOM", theZoom)
+
+    
+    markers.eachLayer(function(marker){
+        var dynsize = 0
+        
+        if (theZoom >= 17){
+            dynsize = 40
+        }
+
+        else if(theZoom > 12){
+            dynsize = 75
+        }
+        else {
+            dynsize = 900
+        }
+
+       
+
+
+
+        marker.setRadius(dynsize)
+    })
 
 
 //mapState: "++k, lat,lon,z"
@@ -444,6 +560,8 @@ db.transaction("rw", db.mapState, function*(){
 })
 
 
+
+
 })
 
 function bc2(){
@@ -455,6 +573,28 @@ function bc2(){
 
 
 }
+
+var theFirst = true
+
+map.on('moveend',function(e){
+    if(theFirst){
+        theFirst = false
+        bc()
+        
+    }
+    else{
+
+        db.transaction("rw", db.mapState, function*(){
+    var p = yield db.mapState.put({
+        k:1,
+        lat: e.target.getCenter().lat,
+        lon : e.target.getCenter().lng,
+        z : e.target.getZoom()
+    })
+})
+
+    }
+})
 
 var isMapShown = true
 
